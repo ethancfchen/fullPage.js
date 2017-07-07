@@ -823,6 +823,7 @@
             $body.append('<div id="' + SECTION_NAV + '"><ul></ul></div>');
             var nav = $(SECTION_NAV_SEL);
 
+            nav.addClass(SECTION_NAV);
             nav.addClass(function() {
                 return options.showActiveTooltip ? SHOW_ACTIVE_TOOLTIP + ' ' + options.navigationPosition : options.navigationPosition;
             });
