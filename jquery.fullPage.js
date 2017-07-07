@@ -157,6 +157,7 @@
             recordHistory: true,
 
             //design
+            fitToParent: false,
             controlArrows: true,
             controlArrowColor: '#fff',
             verticalCentered: true,
@@ -451,11 +452,13 @@
          * When resizing is finished, we adjust the slides sizes and positions
          */
         function reBuild(resizing){
+            var parentHeight = null;
             if(container.hasClass(DESTROYED)){ return; }  //nothing to do if the plugin was destroyed
 
             isResizing = true;
 
             windowsHeight = $window.height();  //updating global var
+            parentHeight = options.fitToParent ? container.height() : windowsHeight;
 
             $(SECTION_SEL).each(function(){
                 var slidesWrap = $(this).find(SLIDES_WRAPPER_SEL);
@@ -466,7 +469,7 @@
                     $(this).find(TABLE_CELL_SEL).css('height', getTableHeight($(this)) + 'px');
                 }
 
-                $(this).css('height', windowsHeight + 'px');
+                $(this).css('height', parentHeight + 'px');
 
                 //resizing the scrolling divs
                 if(options.scrollOverflow){
@@ -749,13 +752,15 @@
         * Styling vertical sections
         */
         function styleSection(section, index){
+            var parentHeight = options.fitToParent ? container.height() : windowsHeight;
+            
             //if no active section is defined, the 1st one will be the default one
             if(!index && $(SECTION_ACTIVE_SEL).length === 0) {
                 section.addClass(ACTIVE);
             }
             startingSection = $(SECTION_ACTIVE_SEL);
 
-            section.css('height', windowsHeight + 'px');
+            section.css('height', parentHeight + 'px');
 
             if(options.paddingTop){
                 section.css('padding-top', options.paddingTop);
@@ -1351,15 +1356,16 @@
         */
         function getDestinationPosition(element){
             var elemPosition = element.position();
+            var parentHeight = options.fitToParent ? container.height() : windowsHeight;
 
             //top of the desination will be at the top of the viewport
             var position = elemPosition.top;
             var isScrollingDown =  elemPosition.top > previousDestTop;
-            var sectionBottom = position - windowsHeight + element.outerHeight();
+            var sectionBottom = position - parentHeight + element.outerHeight();
             var bigSectionsDestination = options.bigSectionsDestination;
 
             //is the destination element bigger than the viewport?
-            if(element.outerHeight() > windowsHeight){
+            if(element.outerHeight() > parentHeight){
                 //scrolling up?
                 if(!isScrollingDown && !bigSectionsDestination || bigSectionsDestination === 'bottom' ){
                     position = sectionBottom;
