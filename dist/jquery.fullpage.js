@@ -1,5 +1,5 @@
 /*!
- * fullPage 2.9.4
+ * fullPage 2.9.5
  * https://github.com/alvarotrigo/fullPage.js
  * @license MIT licensed
  *
@@ -157,6 +157,7 @@
             recordHistory: true,
 
             //design
+            fitToParent: false,
             controlArrows: true,
             controlArrowColor: '#fff',
             verticalCentered: true,
@@ -345,12 +346,16 @@
                     setIsScrollAllowed(value, direction, 'm');
                 });
             }
-            else if(value){
-                setMouseWheelScrolling(true);
-                addTouchHandler();
-            }else{
-                setMouseWheelScrolling(false);
-                removeTouchHandler();
+            else{
+                setIsScrollAllowed(value, 'all', 'm');
+
+                if(value){
+                    setMouseWheelScrolling(true);
+                    addTouchHandler();
+                }else{
+                    setMouseWheelScrolling(false);
+                    removeTouchHandler();
+                }
             }
         }
 
@@ -365,6 +370,7 @@
                     setIsScrollAllowed(value, direction, 'k');
                 });
             }else{
+                setIsScrollAllowed(value, 'all', 'k');
                 options.keyboardScrolling = value;
             }
         }
@@ -446,11 +452,13 @@
          * When resizing is finished, we adjust the slides sizes and positions
          */
         function reBuild(resizing){
+            var parentHeight = null;
             if(container.hasClass(DESTROYED)){ return; }  //nothing to do if the plugin was destroyed
 
             isResizing = true;
 
             windowsHeight = $window.height();  //updating global var
+            parentHeight = options.fitToParent ? container.height() : windowsHeight;
 
             $(SECTION_SEL).each(function(){
                 var slidesWrap = $(this).find(SLIDES_WRAPPER_SEL);
@@ -461,7 +469,7 @@
                     $(this).find(TABLE_CELL_SEL).css('height', getTableHeight($(this)) + 'px');
                 }
 
-                $(this).css('height', windowsHeight + 'px');
+                $(this).css('height', parentHeight + 'px');
 
                 //resizing the scrolling divs
                 if(options.scrollOverflow){
@@ -606,12 +614,12 @@
             * Ignoring the scrolls over the specified selectors.
             */
             if(options.normalScrollElements){
-                $document.on('mouseenter', options.normalScrollElements, function () {
-                    setMouseWheelScrolling(false);
+                $document.on('mouseenter touchstart', options.normalScrollElements, function () {
+                    setAllowScrolling(false);
                 });
 
-                $document.on('mouseleave', options.normalScrollElements, function(){
-                    setMouseWheelScrolling(true);
+                $document.on('mouseleave touchend', options.normalScrollElements, function(){
+                    setAllowScrolling(true);
                 });
             }
         }
@@ -744,13 +752,15 @@
         * Styling vertical sections
         */
         function styleSection(section, index){
+            var parentHeight = options.fitToParent ? container.height() : windowsHeight;
+            
             //if no active section is defined, the 1st one will be the default one
             if(!index && $(SECTION_ACTIVE_SEL).length === 0) {
                 section.addClass(ACTIVE);
             }
             startingSection = $(SECTION_ACTIVE_SEL);
 
-            section.css('height', windowsHeight + 'px');
+            section.css('height', parentHeight + 'px');
 
             if(options.paddingTop){
                 section.css('padding-top', options.paddingTop);
@@ -818,6 +828,7 @@
             $body.append('<div id="' + SECTION_NAV + '"><ul></ul></div>');
             var nav = $(SECTION_NAV_SEL);
 
+            nav.addClass(SECTION_NAV);
             nav.addClass(function() {
                 return options.showActiveTooltip ? SHOW_ACTIVE_TOOLTIP + ' ' + options.navigationPosition : options.navigationPosition;
             });
@@ -908,7 +919,7 @@
             lazyLoad(section);
             playMedia(section);
             options.scrollOverflowHandler.afterLoad();
-            
+
             if(isDestinyTheStartingSection()){
                 $.isFunction( options.afterLoad ) && options.afterLoad.call(section, section.data('anchor'), (section.index(SECTION_SEL) + 1));
             }
@@ -922,7 +933,7 @@
         function isDestinyTheStartingSection(){
             var anchors =  window.location.hash.replace('#', '').split('/');
             var destinationSection = getSectionByAnchor(decodeURIComponent(anchors[0]));
-    
+
             return !destinationSection.length || destinationSection.length && destinationSection.index() === startingSection.index();
         }
 
@@ -1102,7 +1113,7 @@
         */
         function preventBouncing(event){
             var e = event.originalEvent;
-            if(!checkParentForNormalScrollElement(event.target) && options.autoScrolling && isReallyTouch(e)){
+            if(options.autoScrolling && isReallyTouch(e)){
                 //preventing the easing on iOS devices
                 event.preventDefault();
             }
@@ -1124,7 +1135,7 @@
             var activeSection = $(e.target).closest(SECTION_SEL);
 
             // additional: if one of the normalScrollElements isn't within options.normalScrollElementTouchThreshold hops up the DOM chain
-            if (!checkParentForNormalScrollElement(event.target) && isReallyTouch(e) ) {
+            if (isReallyTouch(e) ) {
 
                 if(options.autoScrolling){
                     //preventing the easing on iOS devices
@@ -1166,27 +1177,6 @@
                         }
                     }
                 }
-            }
-        }
-
-        /**
-         * recursive function to loop up the parent nodes to check if one of them exists in options.normalScrollElements
-         * Currently works well for iOS - Android might need some testing
-         * @param  {Element} el  target element / jquery selector (in subsequent nodes)
-         * @param  {int}     hop current hop compared to options.normalScrollElementTouchThreshold
-         * @return {boolean} true if there is a match to options.normalScrollElements
-         */
-        function checkParentForNormalScrollElement (el, hop) {
-            hop = hop || 0;
-            var parent = $(el).parent();
-
-            if (hop < options.normalScrollElementTouchThreshold &&
-                parent.is(options.normalScrollElements) ) {
-                return true;
-            } else if (hop == options.normalScrollElementTouchThreshold) {
-                return false;
-            } else {
-                return checkParentForNormalScrollElement(parent, ++hop);
             }
         }
 
@@ -1366,15 +1356,16 @@
         */
         function getDestinationPosition(element){
             var elemPosition = element.position();
+            var parentHeight = options.fitToParent ? container.height() : windowsHeight;
 
             //top of the desination will be at the top of the viewport
             var position = elemPosition.top;
             var isScrollingDown =  elemPosition.top > previousDestTop;
-            var sectionBottom = position - windowsHeight + element.outerHeight();
+            var sectionBottom = position - parentHeight + element.outerHeight();
             var bigSectionsDestination = options.bigSectionsDestination;
 
             //is the destination element bigger than the viewport?
-            if(element.outerHeight() > windowsHeight){
+            if(element.outerHeight() > parentHeight){
                 //scrolling up?
                 if(!isScrollingDown && !bigSectionsDestination || bigSectionsDestination === 'bottom' ){
                     position = sectionBottom;
@@ -1635,7 +1626,7 @@
 
             var panel = getSlideOrSection(destiny);
             var element;
-            
+
             panel.find('img[data-src], img[data-srcset], source[data-src], audio[data-src], iframe[data-src]').each(function(){
                 element = $(this);
 
@@ -2252,7 +2243,7 @@
                     }else{
                         element.wrapInner(wrap);
                     }
-                    scrollOverflowHandler.create(element, scrollHeight);
+                    scrollOverflowHandler.create(element, scrollHeight, iscrollOptions);
                 }
             }
             //removing the scrolling when it is not necessary anymore
@@ -2606,6 +2597,10 @@
         */
         function removeTouchHandler(){
             if(isTouchDevice || isTouch){
+                if(options.autoScrolling){
+                    $body.off(events.touchmove);
+                }
+
                 $(WRAPPER_SEL)
                     .off(events.touchstart)
                     .off(events.touchmove);
@@ -2709,17 +2704,16 @@
         * @type  m (mouse) or k (keyboard)
         */
         function setIsScrollAllowed(value, direction, type){
-            switch (direction){
-                case 'up': isScrollAllowed[type].up = value; break;
-                case 'down': isScrollAllowed[type].down = value; break;
-                case 'left': isScrollAllowed[type].left = value; break;
-                case 'right': isScrollAllowed[type].right = value; break;
-                case 'all':
-                    if(type == 'm'){
-                        setAllowScrolling(value);
-                    }else{
-                        setKeyboardScrolling(value);
-                    }
+            //up, down, left, right
+            if(direction !== 'all'){
+                isScrollAllowed[type][direction] = value;
+            }
+
+            //all directions?
+            else{
+                $.each(Object.keys(isScrollAllowed[type]), function(index, key){
+                    isScrollAllowed[type][key] = value;
+                });
             }
         }
 
@@ -2922,204 +2916,4 @@
         }
 
     }; //end of $.fn.fullpage
-
-    if(typeof IScroll !== 'undefined'){
-        /*
-        * Turns iScroll `mousewheel` option off dynamically
-        * https://github.com/cubiq/iscroll/issues/1036
-        */
-        IScroll.prototype.wheelOn = function () {
-            this.wrapper.addEventListener('wheel', this);
-            this.wrapper.addEventListener('mousewheel', this);
-            this.wrapper.addEventListener('DOMMouseScroll', this);
-        };
-
-        /*
-        * Turns iScroll `mousewheel` option on dynamically
-        * https://github.com/cubiq/iscroll/issues/1036
-        */
-        IScroll.prototype.wheelOff = function () {
-            this.wrapper.removeEventListener('wheel', this);
-            this.wrapper.removeEventListener('mousewheel', this);
-            this.wrapper.removeEventListener('DOMMouseScroll', this);
-        };
-    }
-
-    /**
-     * An object to handle overflow scrolling.
-     * This uses jquery.slimScroll to accomplish overflow scrolling.
-     * It is possible to pass in an alternate scrollOverflowHandler
-     * to the fullpage.js option that implements the same functions
-     * as this handler.
-     *
-     * @type {Object}
-     */
-    var iscrollHandler = {
-        refreshId: null,
-        iScrollInstances: [],
-
-        // Enables or disables the mouse wheel for the active section or all slides in it
-        toggleWheel: function(value){
-            var scrollable = $(SECTION_ACTIVE_SEL).find(SCROLLABLE_SEL);
-            scrollable.each(function(){
-                var iScrollInstance = $(this).data('iscrollInstance');
-                if(typeof iScrollInstance !== 'undefined' && iScrollInstance){
-                    if(value){
-                        iScrollInstance.wheelOn();
-                    }
-                    else{
-                        iScrollInstance.wheelOff();
-                    }
-                }
-            });
-        },
-
-        /**
-        * Turns off iScroll for the destination section.
-        * When scrolling very fast on some trackpads (and Apple laptops) the inertial scrolling would
-        * scroll the destination section/slide before the sections animations ends.
-        */
-        onLeave: function(){
-            iscrollHandler.toggleWheel(false);
-        },
-
-        // Turns off iScroll for the leaving section
-        beforeLeave: function(){
-            iscrollHandler.onLeave()
-        },
-
-        // Turns on iScroll on section load
-        afterLoad: function(){
-            iscrollHandler.toggleWheel(true);
-        },
-
-        /**
-         * Called when overflow scrolling is needed for a section.
-         *
-         * @param  {Object} element      jQuery object containing current section
-         * @param  {Number} scrollHeight Current window height in pixels
-         */
-        create: function(element, scrollHeight) {
-            var scrollable = element.find(SCROLLABLE_SEL);
-
-            scrollable.height(scrollHeight);
-            scrollable.each(function() {
-                var $this = $(this);
-                var iScrollInstance = $this.data('iscrollInstance');
-                if (iScrollInstance) {
-                    $.each(iscrollHandler.iScrollInstances, function(){
-                        $(this).destroy();
-                    });
-                }
-
-                iScrollInstance = new IScroll($this.get(0), iscrollOptions);
-                iscrollHandler.iScrollInstances.push(iScrollInstance);
-
-                //off by default until the section gets active
-                iScrollInstance.wheelOff();
-
-                $this.data('iscrollInstance', iScrollInstance);
-            });
-        },
-
-        /**
-         * Return a boolean depending on whether the scrollable element is a
-         * the end or at the start of the scrolling depending on the given type.
-         *
-         * @param  {String}  type       Either 'top' or 'bottom'
-         * @param  {Object}  scrollable jQuery object for the scrollable element
-         * @return {Boolean}
-         */
-        isScrolled: function(type, scrollable) {
-            var scroller = scrollable.data('iscrollInstance');
-
-            //no scroller?
-            if (!scroller) {
-                return true;
-            }
-
-            if (type === 'top') {
-                return scroller.y >= 0 && !scrollable.scrollTop();
-            } else if (type === 'bottom') {
-                return (0 - scroller.y) + scrollable.scrollTop() + 1 + scrollable.innerHeight() >= scrollable[0].scrollHeight;
-            }
-        },
-
-        /**
-         * Returns the scrollable element for the given section.
-         * If there are landscape slides, will only return a scrollable element
-         * if it is in the active slide.
-         *
-         * @param  {Object}  activeSection jQuery object containing current section
-         * @return {Boolean}
-         */
-        scrollable: function(activeSection){
-            // if there are landscape slides, we check if the scrolling bar is in the current one or not
-            if (activeSection.find(SLIDES_WRAPPER_SEL).length) {
-                return activeSection.find(SLIDE_ACTIVE_SEL).find(SCROLLABLE_SEL);
-            }
-            return activeSection.find(SCROLLABLE_SEL);
-        },
-
-        /**
-         * Returns the scroll height of the wrapped content.
-         * If this is larger than the window height minus section padding,
-         * overflow scrolling is needed.
-         *
-         * @param  {Object} element jQuery object containing current section
-         * @return {Number}
-         */
-        scrollHeight: function(element) {
-            return element.find(SCROLLABLE_SEL).children().first().get(0).scrollHeight;
-        },
-
-        /**
-         * Called when overflow scrolling is no longer needed for a section.
-         *
-         * @param  {Object} element      jQuery object containing current section
-         */
-        remove: function(element) {
-            var scrollable = element.find(SCROLLABLE_SEL);
-            if (scrollable.length) {
-                var iScrollInstance = scrollable.data('iscrollInstance');
-                iScrollInstance.destroy();
-
-                scrollable.data('iscrollInstance', null);
-            }
-            element.find(SCROLLABLE_SEL).children().first().children().first().unwrap().unwrap();
-        },
-
-        /**
-         * Called when overflow scrolling has already been setup but the
-         * window height has potentially changed.
-         *
-         * @param  {Object} element      jQuery object containing current section
-         * @param  {Number} scrollHeight Current window height in pixels
-         */
-        update: function(element, scrollHeight) {
-            //using a timeout in order to execute the refresh function only once when `update` is called multiple times in a
-            //short period of time.
-            //it also comes on handy because iScroll requires the use of timeout when using `refresh`.
-            clearTimeout(iscrollHandler.refreshId);
-            iscrollHandler.refreshId = setTimeout(function(){
-                $.each(iscrollHandler.iScrollInstances, function(){
-                    $(this).get(0).refresh();
-                });
-            }, 150);
-
-            //updating the wrappers height
-            element.find(SCROLLABLE_SEL).css('height', scrollHeight + 'px').parent().css('height', scrollHeight + 'px');
-        },
-
-        /**
-         * Called to get any additional elements needed to wrap the section
-         * content in order to facilitate overflow scrolling.
-         *
-         * @return {String|Object} Can be a string containing HTML,
-         *                         a DOM element, or jQuery object.
-         */
-        wrapContent: function() {
-            return '<div class="' + SCROLLABLE + '"><div class="fp-scroller"></div></div>';
-        }
-    };
 });
