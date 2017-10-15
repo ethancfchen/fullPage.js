@@ -454,7 +454,9 @@
 
             windowsHeight = $window.height();  //updating global var
             parentHeight = options.fitToParent ? container.height() : windowsHeight;
-
+            if (parentHeight <= 0) {
+              parentHeight = windowsHeight;
+            }
             $(SECTION_SEL).each(function(){
                 var slidesWrap = $(this).find(SLIDES_WRAPPER_SEL);
                 var slides = $(this).find(SLIDE_SEL);
@@ -748,7 +750,10 @@
         */
         function styleSection(section, index){
             var parentHeight = options.fitToParent ? container.height() : windowsHeight;
-            
+            if (parentHeight <= 0) {
+              parentHeight = windowsHeight;
+            }
+
             //if no active section is defined, the 1st one will be the default one
             if(!index && $(SECTION_ACTIVE_SEL).length === 0) {
                 section.addClass(ACTIVE);
@@ -913,7 +918,7 @@
             lazyLoad(section);
             playMedia(section);
             options.scrollOverflowHandler.afterLoad();
-            
+
             if(isDestinyTheStartingSection()){
                 $.isFunction( options.afterLoad ) && options.afterLoad.call(section, section.data('anchor'), (section.index(SECTION_SEL) + 1));
             }
@@ -927,7 +932,7 @@
         function isDestinyTheStartingSection(){
             var anchors =  window.location.hash.replace('#', '').split('/');
             var destinationSection = getSectionByAnchor(decodeURIComponent(anchors[0]));
-    
+
             return !destinationSection.length || destinationSection.length && destinationSection.index() === startingSection.index();
         }
 
@@ -1372,6 +1377,9 @@
         function getDestinationPosition(element){
             var elemPosition = element.position();
             var parentHeight = options.fitToParent ? container.height() : windowsHeight;
+            if (parentHeight > windowsHeight) {
+              parentHeight = windowsHeight;
+            }
 
             //top of the desination will be at the top of the viewport
             var position = elemPosition.top;
@@ -1641,7 +1649,7 @@
 
             var panel = getSlideOrSection(destiny);
             var element;
-            
+
             panel.find('img[data-src], img[data-srcset], source[data-src], audio[data-src], iframe[data-src]').each(function(){
                 element = $(this);
 
